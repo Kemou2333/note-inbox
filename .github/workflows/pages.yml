@@ -1,0 +1,53 @@
+name: Publish Note Inbox website entry
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Exact published campus-inbox source commit (40 lowercase hex characters)
+        required: true
+        type: string
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+jobs:
+  publish:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Require an exact public source commit
+        env:
+          SOURCE_REF: ${{ inputs.source_ref }}
+        run: '[[ "$SOURCE_REF" =~ ^[0-9a-f]{40}$ ]]'
+      - uses: actions/checkout@v4
+        with:
+          repository: Kemou2333/campus-inbox
+          ref: ${{ inputs.source_ref }}
+          path: app
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: app/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+      - name: Build the published application
+        working-directory: app
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: app/dist
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v5
